@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import numpy as np
 
-from app.detector import ASLDetector
+from app.predictor import ASLDetector
 from app.text_builder import TextBuilder
 from app.stream import VideoStream
 from app.schemas import (

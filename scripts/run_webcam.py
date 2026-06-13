@@ -6,7 +6,7 @@ import os
 # This to make sure app and core modules are importable
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.detector import ASLDetector
+from app.predictor import ASLDetector
 from app.text_builder import TextBuilder
 from app.stream import VideoStream
 from core.config import settings
