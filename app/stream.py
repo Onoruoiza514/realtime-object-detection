@@ -11,12 +11,12 @@ from core.utils import (
 
 class VideoStream:
     """
-    Captures webcam frames, runs detection pipeline,
+    Captures webcam frames, runs the ASL prediction pipeline,
     and yields annotated MJPEG frames for the browser stream.
     """
 
-    def __init__(self, detector, text_builder):
-        self.detector = detector
+    def __init__(self, predictor, text_builder):
+        self.predictor = predictor
         self.text_builder = text_builder
         self.cap = None
         self.is_running = False
@@ -53,16 +53,16 @@ class VideoStream:
                 print("[!] Failed to read frame from webcam.")
                 break
 
-            # Flip frame horizontally for mirror effect
+            # Mirror flip
             frame = cv2.flip(frame, 1)
 
-            # Run full detection pipeline
-            frame, detection = self.detector.process_frame(frame)
+            # Run full prediction pipeline
+            frame, detection = self.predictor.process_frame(frame)
 
             # Update text builder
             text_state = self.text_builder.update(detection["letter"])
 
-            # Draw bounding box for static signs
+            # Draw bounding box for detected hand/sign
             if detection["bbox"] and detection["letter"]:
                 frame = draw_detection_box(
                     frame,
@@ -104,26 +104,14 @@ class VideoStream:
     def _draw_buffer_progress(self, frame, progress):
         """
         Draw a small progress bar showing letter confirmation progress.
-        Fills up as the letter stays stable — confirms when full.
         """
-        import cv2
         h, w = frame.shape[:2]
         bar_x, bar_y = 20, h - 175
         bar_w, bar_h = 250, 10
 
-        # Background bar
         cv2.rectangle(frame, (bar_x, bar_y),
                       (bar_x + bar_w, bar_y + bar_h), (60, 60, 60), -1)
 
-        # Fill based on progress
         fill_w = int(bar_w * progress)
         if fill_w > 0:
             color = (0, 200, 100) if progress < 1.0 else (0, 255, 150)
-            cv2.rectangle(frame, (bar_x, bar_y),
-                          (bar_x + fill_w, bar_y + bar_h), color, -1)
-
-        # Label
-        cv2.putText(frame, "Confirming...", (bar_x + bar_w + 10, bar_y + 9),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (150, 150, 150), 1)
-
-        return frame

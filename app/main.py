@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import numpy as np
 
-from app.predictor import ASLDetector
+from app.predictor import ASLPredictor
 from app.text_builder import TextBuilder
 from app.stream import VideoStream
 from app.schemas import (
@@ -16,15 +16,15 @@ from core.config import settings
 
 
 # --- App lifespan: load model on startup ---
-detector = ASLDetector()
+predictor = ASLPredictor()
 text_builder = TextBuilder()
-video_stream = VideoStream(detector, text_builder)
+video_stream = VideoStream(predictor, text_builder)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"[✓] Starting {settings.APP_TITLE} v{settings.APP_VERSION}")
-    detector.load_model()
+    predictor.load_model()
     video_stream.start()
     yield
     video_stream.stop()
@@ -60,7 +60,7 @@ async def health():
     """Health check — confirms model is loaded and ready."""
     return HealthResponse(
         status="ok",
-        model_loaded=detector.model_loaded,
+        model_loaded=predictor.model_loaded,
         device=settings.DEVICE,
         version=settings.APP_VERSION
     )
@@ -92,7 +92,7 @@ async def detect(file: UploadFile = File(...)):
             fps=0.0
         )
 
-    frame, detection = detector.process_frame(frame)
+    frame, detection = predictor.process_frame(frame)
     text_state = text_builder.update(detection["letter"])
 
     return FrameResponse(
