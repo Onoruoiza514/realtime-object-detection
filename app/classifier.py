@@ -1,68 +1,72 @@
 import cv2
-import numpy as np
 from ultralytics import YOLO
 from core.config import settings
 
 
 class ASLClassifier:
     """
-    Handles ASL letter classification.
-    Uses cropped hand images only.
+    Loads a trained YOLOv8 classification model and predicts
+    the ASL letter from a cropped hand image.
     """
 
     def __init__(self):
-
+        self.model = None
+        self.model_loaded = False
         self.device = settings.DEVICE
 
-        self.model = YOLO(settings.MODEL_PATH)
+    def load_model(self):
+        """Load the classification model from MODEL_PATH."""
+        try:
+            self.model = YOLO(settings.MODEL_PATH)
+            self.model.to(self.device)
+            self.model_loaded = True
+            print(f"[✓] Classifier loaded from {settings.MODEL_PATH} on {self.device}")
+        except Exception as e:
+            print(f"[!] Classifier model not found: {e}")
+            self.model_loaded = False
 
-        self.model.to(self.device)
-
-        print(f"[✓] Classifier loaded on {self.device}")
-
-    def preprocess(self, hand_crop):
+    def predict(self, crop):
         """
-        Resize hand crop for classification.
-        """
+        Classify a cropped hand image.
 
-        if hand_crop is None or hand_crop.size == 0:
-            return None
+        Args:
+            crop: BGR image (numpy array) of the cropped hand region
 
-        resized = cv2.resize(hand_crop, (224, 224))
-
-        return resized
-
-    def predict(self, hand_crop):
-        """
-        Predict ASL letter from cropped hand image.
         Returns:
-        - label
-        - confidence
+            label: predicted letter (str) or None
+            confidence: float (0.0 - 1.0)
         """
-
-        processed = self.preprocess(hand_crop)
-
-        if processed is None:
+        if not self.model_loaded or crop is None or crop.size == 0:
             return None, 0.0
 
-        results = self.model(
-            processed,
-            verbose=False,
-            device=self.device
-        )
+        results = self.model(crop, device=self.device, verbose=False)
 
-        probs = results[0].probs
-
-        if probs is None:
+        if not results:
             return None, 0.0
 
-        class_id = int(probs.top1)
+        result = results[0]
 
-        confidence = float(probs.top1conf)
+        # Classification models return probs, not boxes
+        if result.probs is None:
+            return None, 0.0
 
-        label = settings.ASL_CLASSES[class_id]
+        top1_idx = int(result.probs.top1)
+        confidence = float(result.probs.top1conf)
 
         if confidence < settings.CONFIDENCE_THRESHOLD:
+            return None, confidence
+
+        # Map class index to label using model names or settings fallback
+        names = result.names if hasattr(result, "names") else None
+        if names and top1_idx in names:
+            label = names[top1_idx]
+        elif top1_idx < len(settings.ASL_CLASSES):
+            label = settings.ASL_CLASSES[top1_idx]
+        else:
+            label = None
+
+        # Exclude motion signs — handled separately by hand_tracker trajectory
+        if label in settings.MOTION_SIGNS:
             return None, confidence
 
         return label, confidence
