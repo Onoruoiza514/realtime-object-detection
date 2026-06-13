@@ -10,94 +10,85 @@ from core.config import settings
 
 def train():
     print(f"\n{'='*50}")
-    print(f"  ASL YOLOv8 Model Training")
+    print(f"  ASL Classifier Training (YOLOv8-cls)")
     print(f"{'='*50}\n")
 
     # -------------------------------------------------------
-    # DATASET SETUP
+    # DATASET SETUP — classification format (different from detection!)
     # -------------------------------------------------------
-    # We use the free Roboflow ASL Dataset (A-Z, 26 classes)
-    # Steps to get it:
-    # 1. Go to: https://universe.roboflow.com/david-lee-d0rhs/american-sign-language-letters
-    # 2. Click Export → YOLOv8 format → download zip
-    # 3. Extract into: data/asl_dataset/
-    # 4. Your data/ folder should look like:
-    #    data/asl_dataset/
-    #      ├── train/images/  & train/labels/
-    #      ├── valid/images/  & valid/labels/
-    #      ├── test/images/   & test/labels/
-    #      └── data.yaml
+    # YOLOv8 classification expects a folder structure like:
+    #
+    # data/asl_cls_dataset/
+    #   ├── train/
+    #   │   ├── A/  (folder of cropped images of letter A)
+    #   │   ├── B/
+    #   │   ├── ...
+    #   │   └── Y/
+    #   └── val/
+    #       ├── A/
+    #       ├── B/
+    #       ├── ...
+    #       └── Y/
+    #
+    # (J and Z excluded — handled via MediaPipe motion tracking)
+    #
+    # If you only have the detection dataset (with bounding boxes),
+    # run scripts/prepare_classification_data.py first to crop
+    # hand regions using the bounding box labels and sort them
+    # into per-letter folders.
     # -------------------------------------------------------
 
-    dataset_yaml = Path("data/asl_dataset/data.yaml")
+    dataset_dir = Path("data/asl_cls_dataset")
 
-    if not dataset_yaml.exists():
-        print("[!] Dataset not found at data/asl_dataset/data.yaml")
-        print("\n  Please follow these steps:")
-        print("  1. Visit: https://universe.roboflow.com/david-lee-d0rhs/american-sign-language-letters")
-        print("  2. Export in YOLOv8 format")
-        print("  3. Extract into data/asl_dataset/")
-        print("  4. Re-run this script\n")
+    if not dataset_dir.exists():
+        print("[!] Classification dataset not found at data/asl_cls_dataset/")
+        print("\n  Run this first to convert your detection dataset:")
+        print("  python scripts/prepare_classification_data.py\n")
         return
 
-    print(f"[✓] Dataset found at {dataset_yaml}")
+    print(f"[✓] Dataset found at {dataset_dir}")
     print(f"[✓] Device: {settings.DEVICE.upper()}")
     print(f"[✓] Starting training...\n")
 
-    # Load base YOLOv8 model
-    model = YOLO("yolov8n.pt")  # nano — fast training, good accuracy
+    # Load base YOLOv8 classification model (nano)
+    model = YOLO("yolov8n-cls.pt")
 
-    # Train
     results = model.train(
-        data=str(dataset_yaml),
+        data=str(dataset_dir),
         epochs=20,
-        imgsz=320,
-        batch=4,
+        imgsz=settings.ROI_SIZE,
+        batch=8,
         device=settings.DEVICE,
         project="models",
-        name="asl_yolov8",
+        name="asl_classifier",
         exist_ok=True,
-        patience=10,           # early stopping
+        patience=5,
         save=True,
-        save_period=10,        # save checkpoint every 10 epochs
+        save_period=5,
         val=True,
-        plots=True,            # save training curves
+        plots=True,
         verbose=True,
-
-        # Augmentation — improves generalization
-        hsv_h=0.015,
-        hsv_s=0.7,
-        hsv_v=0.4,
-        fliplr=0.0,            # don't flip — hand signs are not symmetric
-        flipud=0.0,
-        mosaic=0.5,
-        scale=0.2,
-        translate=0.05,
-        workers = 8,
-        cache=True
     )
 
     print(f"\n{'='*50}")
     print(f"[✓] Training complete!")
-    print(f"[✓] Best weights saved to: models/asl_yolov8/weights/best.pt")
+    print(f"[✓] Best weights saved to: models/asl_classifier/weights/best.pt")
     print(f"{'='*50}\n")
 
-    # Validate on test set
-    print("[→] Running validation on test set...\n")
+    # Validate
+    print("[→] Running validation...\n")
     metrics = model.val()
-    print(f"\n  mAP50:     {metrics.box.map50:.4f}")
-    print(f"  mAP50-95:  {metrics.box.map:.4f}")
-    print(f"  Precision: {metrics.box.mp:.4f}")
-    print(f"  Recall:    {metrics.box.mr:.4f}\n")
+    print(f"\n  Top-1 Accuracy: {metrics.top1:.4f}")
+    print(f"  Top-5 Accuracy: {metrics.top5:.4f}\n")
 
-    # Copy best weights to models/ root for easy access
-    best_weights = Path("models/asl_yolov8/weights/best.pt")
+    # Copy best weights to models/ root
+    best_weights = Path("models/asl_classifier/weights/best.pt")
     if best_weights.exists():
         import shutil
         shutil.copy(best_weights, Path(settings.MODEL_PATH))
         print(f"[✓] Best weights copied to {settings.MODEL_PATH}")
 
-    print("\n[✓] All done! You can now run the app with your trained model.\n")
+    print("\n[✓] All done! You can now run the app with your trained classifier.\n")
 
 
 if __name__ == "__main__":
