@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+*.egg
+build/
+dist/
+
+# Virtual environment
+venv/
+.venv/
+env/
+ENV/
+
+# Environment variables
+.env
+
+# Model weights (large files)
+*.pt
+*.pth
+*.onnx
+*.engine
+models/*.pt
+models/asl_yolov8/
+models/asl_classifier/
+
+# Training runs / outputs
+runs/
+*.cache
+
+# Dataset (large — don't push to GitHub)
+data/asl_dataset/
+data/*.zip
+
+# Roboflow downloads
+download_dataset.py
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
